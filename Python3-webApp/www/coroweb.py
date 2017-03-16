@@ -20,11 +20,14 @@ def get(path):
 	return decorator
 
 def post(path):
+	'''
+	Define decorator @post('/path')
+	'''
 	def decorator(func):
 		@functools.wraps(func)
 		def wrapper(*args, **kw):
 			return func(*args, **kw)
-		wrapper.__mehtod__ = 'POST'
+		wrapper.__method__ = 'POST'
 		wrapper.__route__ = path
 		return wrapper
 	return decorator
@@ -65,7 +68,7 @@ def has_request_arg(fn):
 		if name == 'request':
 			found = True
 			continue
-		if found and (param.kind != inspect.Parameter.VAR_POSITIONAL and parame.kind != inspect.Parameter.KEYWORD_ONLY and param.kind != inspect.Parameter.VAR_KEYWORD):
+		if found and (parame.kind != inspect.Parameter.VAR_POSITIONAL and parame.kind != inspect.Parameter.KEYWORD_ONLY and parame.kind != inspect.Parameter.VAR_KEYWORD):
 			raise ValueError('request parameter must be the last named parameter in function:%s%s' % (fn.__name__, str(sig)))
 	return found
 
@@ -77,6 +80,7 @@ class RequestHandler(object):
 		self._has_request_arg = has_request_arg(fn)
 		self._has_var_kw_arg = has_var_kw_arg(fn)
 		self._has_name_kw_args = has_named_kw_args(fn)
+		self._named_kw_args = get_named_kw_args(fn)
 		self._required_kw_args = get_required_kw_args(fn)
 
 	async def __call__(self, request):
@@ -87,7 +91,7 @@ class RequestHandler(object):
 					return web.HTTPBadRequest('Missing Content-Type.')
 				ct = request.content_type.lower()
 				if ct.startswith('application/json'):
-					param = await request.json()
+					params = await request.json()
 					if not isinstance(params, dict):
 						return web.HTTPBadRequest('JSON body must be object.')
 					kw = params
@@ -129,7 +133,7 @@ class RequestHandler(object):
 			r = await self._func(**kw)
 			return r
 		except APIError as e:
-			raise dict(error=e.error, data=e.data, message=e.message)
+			return dict(error=e.error, data=e.data, message=e.message)
 
 def add_static(app):
 	path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
