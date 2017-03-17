@@ -98,6 +98,13 @@ async def get_blog(id):
 		'comments': comments
 	}
 
+@get('/manage/blogs')
+def manage_blogs(*, page='1'):
+	return {
+		'__template__' : 'manage_blogs.html',
+		'page_index' : get_page_index(page)
+	}
+
 @get('/manage/blogs/create')
 def manage_create_blog():
 	return {
@@ -117,6 +124,14 @@ def signin():
 	return {
 		'__template__' : 'signin.html'
 	}
+
+@get('/signout')
+def signout(request):
+	referer = request.headers.get('Referer')
+	r = web.HTTPFound(referer or '/')
+	r.set_cookie(COOKIE_NAME, '-deleted-', max_age=0, httponly=True)
+	logging.info('user signed out.')
+	return r
 
 @post('/api/authenticate')
 async def authenticate(*, email, passwd):
@@ -143,13 +158,7 @@ async def authenticate(*, email, passwd):
 	r.body = json.dumps(user, ensure_ascii=False).encode('utf-8')
 	return r
 
-@get('/signout')
-def signout(request):
-	referer = request.headers.get('Referer')
-	r = web.HTTPFound(referer or '/')
-	r.set_cookie(COOKIE_NAME, '-deleted-', max_age=0, httponly=True)
-	logging.info('user signed out.')
-	return r
+
 
 _RE_EMAIL = re.compile(r'^[a-z0-9\.\-\_]+\@[a-z0-9\-\_]+(\.[a-z0-9\-\_]+){1,4}$')
 _RE_SHA1 = re.compile(r'^[0-9a-f]{40}$')
@@ -177,6 +186,15 @@ async def api_register_user(*, email, name, passwd):
 	r.body = json.dumps(user, ensure_ascii=False).encode('utf-8')
 	return r
 
+@get('/api/blogs')
+async def api_blogs(*, page='1'):
+	page_index = get_page_index(page)
+	num = await Blog.findNumber('count(id)')
+	p = Page(num, page_index)
+	if num == 0:
+		return dict(page=p, blogs=())
+	blogs = await Blog.findAll(orderBy='created_at desc', limit=(p.offset, p.limit))
+	return dict(page=p, blogs=blogs)
 
 @get('/api/blogs/{id}')
 async def api_get_blog(*, id):
@@ -195,3 +213,5 @@ async def api_create_blog(request, *, name, summary, content):
 	blog = Blog(user_id=request.__user__.id, user_name=request.__user__.name, user_image=request.__user__.image, name=name.strip(), summary=summary.strip(), content=content.strip())
 	await blog.save()
 	return blog
+
+
