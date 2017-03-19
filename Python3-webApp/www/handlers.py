@@ -69,7 +69,7 @@ async def cookie2user(cookie_str):
 		raise None
 
 def text2html(text):
-	lines = map(lambda s: '<p>%s</p>' % s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'), filter(lambda s: s.scrip() != '', text.split('\n')))
+	lines = map(lambda s: '<p>%s</p>' % s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'), filter(lambda s: s.strip() != '', text.split('\n')))
 	return ''.join(lines)
 
 @get('/')
@@ -266,18 +266,16 @@ async def api_comments(*, page='1'):
 	return dict(page=p, comments=comments)
 
 @post('/api/blogs/{id}/comments')
-async def api_create_blog_comment(request, *,id, user_id, user_name, user_image, content):
-	check_admin(request)
-	if not id or not id.strip():
-		raise APIValueError('blog_id', 'blog id cannot be empty.')
-	if not user_id or not user_id.strip():
-		raise APIValueError('user_id', 'user id cannot be empty.')
-	if not user_name or not user_name.strip():
-		raise APIValueError('user_name', 'user name cannot be empty.')
-	if not user_image or not user_image.strip():
-		raise APIValueError('user_image', 'user image cannot be empty.')
+async def api_create_blog_comment(id,request, *, content):
+	user = request.__user__
+	if user is None:
+		raise APIPermissionError('Please signin first.')
 	if not content or not content.strip():
-		raise APIValueError('content', 'content cannot be empty.')
-	comment = Comment(blog_id=id, user_id=request.__user__.id, user_name=request.__user__.name, user_image=request.__user__.image, content=content)
-	await content.save()
-	return content
+		raise APIValueError('content')
+	blog = await Blog.find(id)
+	if blog is None:
+		raise APIResourceNotFoundError('Blog')
+	comment = Comment(blog_id=blog.id, user_id=user.id, user_name=user.name, user_image=user.image, content=content)
+	await comment.save()
+	return comment
+
